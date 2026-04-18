@@ -1,49 +1,59 @@
-# ModelHubX: Industrial MLOps & Deployment Platform 🚀
+# ⎔ ModelHubX — Premium MLOps Registry & Deployment Deck
 
-**ModelHubX** is a high-end MLOps platform designed for distributed model registry, automated Kubernetes manifest generation, and real-time inference monitoring. It features a premium, glassmorphic "Mission Control" dashboard and a robust FastAPI backend synthesizer.
+> **"High-end MLOps platform for automated AI model versioning and Kubernetes deployment. Features a premium glassmorphic SaaS dashboard, real-time cluster metrics, and dynamic K8s manifest synthesis."**
 
-## 💎 Key Features
-
-- **Model Registry v2**: Version-controlled model uploads with automated tracking.
-- **K8s Manifest Synthesizer**: Generates production-ready Kubernetes Deployment and Service YAMLs with HPA (Horizontal Pod Autoscaling) support.
-- **Inference Gateway**: Simulated ClusterIP gateway for testing model predictions with real-time feedback.
-- **Premium UI/UX**: Dual-theme (Dark/Light) obsidian aesthetic with high-density MLOps metrics.
-- **Infrastructure-as-Code**: Automated generation of scaling and resource limit policies.
-
-## 🛠️ Technology Stack
-
-- **Backend**: Python 3.9, FastAPI, Pydantic, Uvicorn.
-- **Frontend**: Vanilla JS (ES6+), High-End CSS3 (Glassmorphism, CSS Variables).
-- **Infrastructure**: Kubernetes (Synthesis), Docker, Docker Compose.
-- **Data Store**: Persistent Volume Storage, Redis (Metadata Store).
-
-## 🏗️ Architecture Overview
-
-```mermaid
-graph TD
-    A[ModelHubX UI] -->|REST API| B[FastAPI Controller]
-    B -->|Synthesize| C[K8s Manifests .yaml]
-    B -->|Registry| D[Model Store .pkl]
-    B -->|Inference| E[Gateway Simulator]
-    E -->|Route| F[Pod Replicas]
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.9+ (for local testing)
-
-### Run via Docker
-```bash
-git clone https://github.com/YOUR_USER/kubeai-project.git
-cd kubeai-project
-docker-compose up --build
-```
-Access the Mission Control dashboard at `http://localhost:8000`.
-
-## 🌗 Dual-Theme Experience
-ModelHubX supports both **Obsidian Dark** and **Clean SaaS Light** modes, optimized for high-density data visibility across different lighting conditions.
+[![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square)](https://fastapi.tiangolo.com)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square)](https://redis.io)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.28-326CE5?style=flat-square)](https://kubernetes.io)
+[![Docker](https://img.shields.io/badge/Docker-24-2496ED?style=flat-square)](https://docker.com)
 
 ---
-*Developed as a signature MLOps Portfolio Project.*
+
+## 💎 Signature Features
+
+### 🚀 Mission Control Dashboard
+- **Hyper-Blur Glassmorphism**: A premium, aerospace-inspired UI deck with deep obsidian and clean SaaS light modes.
+- **Real-time Diagnostics**: Live metrics tracking Total Model Versions, Active Replicas, and simulated p99 Gateway Latency.
+- **Dual-Theme Engine**: Seamlessly switch between **Obsidian Dark** and **Clean SaaS Light** with persistent user memory.
+
+### 🏗️ K8s Infrastructure Synthesis
+- **Automated Manifesting**: Generates production-ready Kubernetes YAMLs (Deployment, Service, HPA) on the fly for every uploaded model.
+- **HPA Auto-scaling**: Dynamic resource limit calculation and Pod horizontal scaling (1-10 replicas) built into the synthesis engine.
+
+### 📦 AI Model Registry
+- **Versioned Storage**: Immutable model versioning (v1, v2, v3...) with automated latest-release tracking.
+- **Inference Gateway**: Simulated ClusterIP gateway that mimics production inference routing for local testing.
+
+---
+
+## ⚡ Quick Start
+
+### 1. Launch the Hub
+```bash
+# Start the API and Dashboard
+docker compose up --build -d
+```
+
+### 2. Access Mission Control
+- **Dashboard**: `open http://localhost:8000` (Directly served from API)
+- **Inference Docs**: `http://localhost:8000/docs` (Swagger UI)
+
+### 3. Usage Lifecycle
+1. **Upload**: Use the UI to push `.pkl` models to the **Registry**.
+2. **Synthesize**: Scale your pod replicas and click **Deploy to K8s** to generate production manifests.
+3. **Test**: Use the **Inference Gateway** panel to send real JSON payloads to your deployed models.
+
+---
+
+## 🛠️ Internal Tech Stack
+
+- **Backend**: Python 3.11 / FastAPI (Non-blocking I/O)
+- **Storage**: Redis 7 (Metadata & Versioning)
+- **Frontend**: Vanilla JS / HTML5 / Premium CSS (Glassmorphism Tier)
+- **DevOps**: Docker Compose / Kubernetes Manifest Synth Engine
+
+---
+
+## 📝 License
+MIT — Build anything with it.
