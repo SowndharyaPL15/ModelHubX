@@ -1,0 +1,41 @@
+# ── ModelHubX Local Dev Stack ─────────────────────────────────────────────
+services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: modelhubx-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: ../docker/Dockerfile.api
+    container_name: modelhubx-api
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODELS_DIR=/models
+      - OUT_DIR=/out
+      - FRONTEND_DIR=/frontend
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
+      - ./frontend:/frontend
+      - models-data:/models
+      - ./out:/out
+
+volumes:
+  redis-data:
+  models-data:

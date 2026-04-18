@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModelHubX — Deployment Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Theme Tokens - Default (Dark) */
+  --bg:          #030507;
+  --surface:     rgba(15, 18, 25, 0.7);
+  --surface-top: rgba(25, 30, 45, 0.8);
+  --border:      rgba(255, 255, 255, 0.08);
+  --border-glow: rgba(59, 130, 246, 0.2);
+  --accent:      #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.5);
+  --accent2:     #8b5cf6;
+  --warn:        #f59e0b;
+  --green:       #10b981;
+  --green-glow:  rgba(16, 185, 129, 0.4);
+  --danger:      #ef4444;
+  --text:        #f8fafc;
+  --text-dim:    #94a3b8;
+  --mono-bg:     #000000;
+  
+  --mono:        'JetBrains Mono', monospace;
+  --sans:        'Outfit', sans-serif;
+  --int:         'Inter', sans-serif;
+  --transition:  all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="light"] {
+  --bg:          #f1f5f9;
+  --surface:     rgba(255, 255, 255, 0.85);
+  --surface-top: #ffffff;
+  --border:      rgba(0, 0, 0, 0.1);
+  --border-glow: rgba(59, 130, 246, 0.1);
+  --accent:      #2563eb;
+  --accent-glow: rgba(37, 99, 235, 0.2);
+  --accent2:     #7c3aed;
+  --text:        #0f172a;
+  --text-dim:    #475569;
+  --mono-bg:     #f8fafc;
+}
+
+/* High-Visibility Overrides */
+[data-theme="light"] body { color: var(--text); }
+[data-theme="light"] .stat-card .value { color: var(--text) !important; text-shadow: none !important; }
+[data-theme="light"] .panel h2 { color: var(--text); }
+[data-theme="light"] .sidebar-title { color: var(--text-dim); }
+[data-theme="light"] th { color: var(--text); background: rgba(0,0,0,0.03); }
+[data-theme="light"] label { color: var(--text); }
+[data-theme="light"] .pulsar { background: var(--green); box-shadow: 0 0 10px var(--green); }
+[data-theme="light"] .btn-secondary { color: var(--text); border-color: var(--border); }
+[data-theme="light"] .modal-header .sidebar-title { color: var(--text); }
+[data-theme="light"] header { background: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(0,0,0,0.1); }
+[data-theme="light"] nav button { color: var(--text-dim); }
+[data-theme="light"] nav button:hover { color: var(--text); background: rgba(0,0,0,0.05); }
+[data-theme="light"] nav button.active { color: var(--accent); background: #ffffff; border-color: var(--border); }
+[data-theme="light"] .logo { color: var(--text); }
+
+*, *::before, *::after { 
+  box-sizing: border-box; margin: 0; padding: 0; 
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+  background-color: var(--bg);
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* ── ANIMATED BACKGROUND MESH ── */
+body::after {
+  content: "";
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03; pointer-events: none; z-index: 10;
+}
+
+header {
+  position: sticky; top: 0; z-index: 1000;
+  height: 70px; padding: 0 40px;
+  background: rgba(3, 5, 7, 0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.logo {
+  display: flex; align-items: center; gap: 14px;
+  font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+}
+.logo-icon {
+  width: 34px; height: 34px; 
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 10px; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 16px;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+nav { display: flex; gap: 4px; background: rgba(255,255,255,0.03); padding: 4px; border-radius: 12px; border: 1px solid var(--border); }
+nav button {
+  background: none; border: none; color: var(--text-dim);
+  font-family: var(--int); font-size: 13px; font-weight: 500;
+  padding: 8px 18px; border-radius: 8px; cursor: pointer; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+nav button:hover { color: #fff; background: rgba(255,255,255,0.05); }
+nav button.active { color: #fff; background: var(--surface-top); border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+
+.app { max-width: 1300px; margin: 0 auto; padding: 40px; position: relative; z-index: 1; }
+
+/* ── GLASS MODULE ── */
+.panel {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  margin-bottom: 30px;
+  transition: 0.3s;
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+}
+.panel:hover { border-color: var(--border-glow); transform: translateY(-2px); }
+
+.panel-header {
+  padding: 24px 30px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+
+.panel-body { padding: 30px; }
+
+/* ── FORMS & INPUTS ── */
+.form-group { margin-bottom: 24px; }
+.form-group label { display: block; font-family: var(--int); font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; }
+
+input[type="text"], input[type="file"], select, input[type="range"] {
+  width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--mono); font-size: 14px;
+  padding: 12px 16px; border-radius: 10px; outline: none; transition: 0.2s;
+}
+input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+
+.btn {
+  font-family: var(--int); font-size: 14px; font-weight: 600;
+  padding: 12px 24px; border-radius: 10px; cursor: pointer;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), #2563eb);
+  color: #fff; border: none; box-shadow: 0 8px 20px -6px var(--accent-glow);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -4px var(--accent-glow); filter: brightness(1.1); }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary { background: var(--surface-top); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: var(--text-dim); }
+
+/* ── DATA DISPLAY ── */
+.stats-grid { 
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 30px; 
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 24px; border-radius: 16px; position: relative; overflow: hidden;
+  transition: 0.3s;
+}
+.stat-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+.stat-card::after {
+  content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+.stat-card .label { font-family: var(--int); font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+.stat-card .value { font-size: 32px; font-weight: 700; margin-top: 8px; color: #fff; text-shadow: 0 0 20px rgba(255,255,255,0.1); }
+.stat-card .trend { font-family: var(--mono); font-size: 11px; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+.stat-card .trend.up { color: var(--green); }
+.stat-card .trend.neutral { color: var(--text-dim); }
+
+.grid-2 { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 30px; }
+
+table { width: 100%; border-spacing: 0; }
+th { padding: 16px 20px; text-align: left; font-family: var(--mono); font-size: 11px; color: var(--text-dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+td { padding: 20px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.015); }
+
+.badge {
+  padding: 4px 10px; border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 600;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+}
+.badge-blue { color: #60a5fa; border-color: rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.1); }
+.badge-green { color: #34d399; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1); }
+
+/* ── PULSAR ── */
+.pulsar {
+  width: 10px; height: 10px; background: var(--green); border-radius: 50%;
+  box-shadow: 0 0 12px var(--green-glow);
+  animation: pulse-glow 2s infinite;
+}
+@keyframes pulse-glow {
+  0% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 var(--green-glow); }
+  50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 var(--green-glow); }
+}
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(8px); display: none; place-items: center; z-index: 2000;
+}
+.modal {
+  background: var(--surface-top);
+  border: 1px solid var(--border);
+  width: 90%; max-width: 900px; max-height: 85vh; border-radius: 24px;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+}
+.modal-header { padding: 30px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.modal-body { padding: 40px; overflow-y: auto; font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--text-dim); background: var(--mono-bg); }
+
+#toast {
+  position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(100px);
+  background: var(--surface-top); border: 1px solid var(--accent); color: #fff;
+  padding: 16px 30px; border-radius: 12px; font-family: var(--int); font-size: 14px;
+  opacity: 0; transition: 0.5s cubic-bezier(0.19, 1, 0.22, 1); z-index: 3000;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+#toast.error { border-color: var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">X</div>
+    <div>ModelHub <span style="color:var(--accent)">X</span></div>
+  </div>
+  <nav>
+    <button id="theme-toggle" class="btn btn-secondary" style="padding:6px 10px; margin-right:10px" onclick="toggleTheme()">🌓</button>
+    <button id="nav-registry" class="active" onclick="showTab('registry')">Model Registry</button>
+    <button id="nav-deployments" onclick="showTab('deployments')">Deployments</button>
+  </nav>
+</header>
+
+<div class="app">
+  
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="label">Total Model Versions</div>
+      <div id="stat-models" class="value">0</div>
+      <div class="trend neutral">Registry Integrity 100%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Active K8s Deployments</div>
+      <div id="stat-deployments" class="value">0</div>
+      <div class="trend up">Cluster Stable</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Pod Replicas</div>
+      <div id="stat-pods" class="value">0</div>
+      <div class="trend up">+ HPA Scaling Active</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg API Latency</div>
+      <div class="value">12ms</div>
+      <div class="trend up">Optimized Gateway</div>
+    </div>
+  </div>
+
+  <!-- ==================== REGISTRY TAB ==================== -->
+  <div id="tab-registry">
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">Upload New Model</div>
+        <div class="panel-body">
+          <form id="uploadForm" onsubmit="uploadModel(event)">
+            <div class="form-group">
+              <label>Model Name (ID)</label>
+              <input type="text" id="modelName" placeholder="e.g. fraud-detect" required>
+            </div>
+            <div class="form-group">
+              <label>Model File (.pkl)</label>
+              <input type="file" id="modelFile" accept=".pkl,.joblib" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%">Upload & Version</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Deploy Model</div>
+        <div class="panel-body">
+          <form onsubmit="deployModel(event)">
+            <div class="form-group">
+              <label>Select Model</label>
+              <select id="deployName" required onchange="updateVersionSelect()"></select>
+            </div>
+            <div class="form-group">
+              <label>Select Version</label>
+              <select id="deployVersion" required></select>
+            </div>
+            <div class="form-group">
+              <label>Kubernetes Replicas: <span id="replicaCount" style="color:var(--accent)">1</span></label>
+              <input type="range" id="deployReplicas" min="1" max="10" value="1" oninput="document.getElementById('replicaCount').innerText = this.value">
+              <div class="scaling-info">Autoscaling HPA will be generated (1-10 Pods).</div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="background:var(--accent2);width:100%">Deploy to K8s</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">Registered Models</div>
+      <table>
+        <thead><tr><th>Model Name</th><th>Versions Tracked</th><th>Latest Version</th></tr></thead>
+        <tbody id="modelsTable"><tr><td colspan="3" style="text-align:center;color:var(--muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ==================== DEPLOYMENTS TAB ==================== -->
+  <div id="tab-deployments" style="display: none;">
+    <div class="panel">
+      <div class="panel-header">Active K8s Deployments</div>
+      <table>
+        <thead><tr><th>Model</th><th>Active Version</th><th>Gateway URL</th><th>K8s Replicas</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="deployTable"></tbody>
+      </table>
+    </div>
+
+    <div class="panel" id="inferenceTestPanel" style="display:none; border-color:var(--green)">
+      <div class="panel-header" style="color:var(--green)">Live Inference Console 🛰️</div>
+      <div class="panel-body">
+        <div class="form-group">
+          <label>Target Endpoint ID</label>
+          <input type="text" id="testEndpoint" readonly style="background:var(--bg); border:none; font-weight:bold; color:var(--text)">
+        </div>
+        <div class="form-group">
+          <label>Payload (JSON Array of Features)</label>
+          <input type="text" id="testPayload" value="[[0.1, -1.2, 0.4, 3.1]]">
+        </div>
+        <button class="btn btn-primary" style="background:var(--green)" onclick="testInference()">Send Predict Request</button>
+        
+        <div id="testResult" style="margin-top:16px; padding:16px; background:#000; border:1px solid #333; border-radius:6px; font-family:var(--mono); color:var(--text); white-space:pre-wrap; display:none;"></div>
+      </div>
+    </div>
+
+  </div>
+
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<!-- ==================== MODALS ==================== -->
+<div id="manifestModal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="sidebar-title">K8s Deployment Manifests</div>
+      <button class="btn btn-secondary" style="padding:4px 10px" onclick="closeModal()">Close</button>
+    </div>
+    <div class="modal-body">
+      <pre style="margin:0"><code id="manifestContent"></code></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+let globalModels = [];
+
+function showTab(tab) {
+  document.getElementById('tab-registry').style.display = tab === 'registry' ? 'block' : 'none';
+  document.getElementById('tab-deployments').style.display = tab === 'deployments' ? 'block' : 'none';
+  
+  // Update sidebar buttons
+  document.getElementById('nav-registry').className = tab === 'registry' ? 'active' : '';
+  document.getElementById('nav-deployments').className = tab === 'deployments' ? 'active' : '';
+  
+  if (tab === 'registry') loadModels();
+  if (tab === 'deployments') loadDeployments();
+}
+
+function toast(msg, isErr=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + (isErr ? 'error' : '');
+  setTimeout(() => t.className = '', 3000);
+}
+
+let globalDeployments = [];
+
+function updateStats() {
+  // Calculate stats
+  const totalVersions = globalModels.reduce((acc, m) => acc + m.versions.length, 0);
+  const activeDeployments = globalDeployments.length;
+  const totalPods = globalDeployments.reduce((acc, d) => acc + d.replicas, 0);
+
+  document.getElementById('stat-models').textContent = totalVersions;
+  document.getElementById('stat-deployments').textContent = activeDeployments;
+  document.getElementById('stat-pods').textContent = totalPods;
+}
+
+// ── REGISTRY ─────────────────────────────────────────────────────────────
+async function loadModels() {
+  const res = await fetch(`${API}/api/models`);
+  globalModels = await res.json();
+  
+  const tb = document.getElementById('modelsTable');
+  if(!globalModels.length) {
+    tb.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted)">No models uploaded yet.</td></tr>`;
+  } else {
+    tb.innerHTML = globalModels.map(m => `
+      <tr>
+        <td style="font-weight:600">${m.name}</td>
+        <td>${m.versions.map(v => `<span class="badge badge-blue" style="margin-right:4px">${v.version}</span>`).join('')}</td>
+        <td><span class="badge badge-green">${m.latest_version}</span></td>
+      </tr>
+    `).join('');
+  }
+
+  const sel = document.getElementById('deployName');
+  sel.innerHTML = `<option value="" disabled selected>-- Select --</option>` + 
+                  globalModels.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+  updateVersionSelect();
+  updateStats();
+}
+
+function updateVersionSelect() {
+  const name = document.getElementById('deployName').value;
+  const vSel = document.getElementById('deployVersion');
+  const mod = globalModels.find(m => m.name === name);
+  if(mod) {
+    vSel.innerHTML = mod.versions.map(v => `<option value="${v.version}">${v.version}</option>`).join('');
+    vSel.value = mod.latest_version;
+  } else {
+    vSel.innerHTML = '';
+  }
+}
+
+async function uploadModel(e) {
+  e.preventDefault();
+  const name = document.getElementById('modelName').value;
+  const file = document.getElementById('modelFile').files[0];
+  
+  const formData = new FormData();
+  formData.append('name', name);
+  formData.append('file', file);
+
+  try {
+    const r = await fetch(`${API}/api/models`, { method: 'POST', body: formData });
+    if(!r.ok) throw new Error("Upload failed");
+    toast(`Successfully uploaded ${name}`);
+    document.getElementById('uploadForm').reset();
+    loadModels();
+  } catch(err) { toast(err.message, true); }
+}
+
+async function deployModel(e) {
+  e.preventDefault();
+  const req = {
+    model_name: document.getElementById('deployName').value,
+    version: document.getElementById('deployVersion').value,
+    replicas: parseInt(document.getElementById('deployReplicas').value)
+  };
+  
+  try {
+    const r = await fetch(`${API}/api/deployments`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(req)
+    });
+    if(!r.ok) throw new Error("Deployment failed");
+    toast(`Deployed ${req.model_name} ${req.version} to K8s!`);
+    loadModels();
+  } catch(err) { toast(err.message, true); }
+}
+
+// ── DEPLOYMENTS ──────────────────────────────────────────────────────────
+async function loadDeployments() {
+  const res = await fetch(`${API}/api/deployments`);
+  globalDeployments = await res.json();
+  const tb = document.getElementById('deployTable');
+  
+  if(!globalDeployments.length) {
+    tb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted)">No active deployments.</td></tr>`;
+    document.getElementById('inferenceTestPanel').style.display = 'none';
+    updateStats();
+    return;
+  }
+
+  tb.innerHTML = globalDeployments.map(d => `
+    <tr>
+      <td style="font-weight:600">${d.model_name}<br><small style="color:var(--muted);font-family:var(--mono)">ID: ${d.id}</small></td>
+      <td><span class="badge badge-blue">${d.version}</span></td>
+      <td><code style="color:var(--green)">${d.endpoint}</code></td>
+      <td>${d.replicas} Pods</td>
+      <td><div class="pulsar"></div> <span class="badge badge-green">Running</span></td>
+      <td>
+        <button class="btn" style="padding:4px 8px;font-size:11px" onclick="openTest('${d.id}')">Test</button>
+        <button class="btn" style="padding:4px 8px;font-size:11px;color:var(--accent)" onclick="viewManifest('${d.id}')">Infra</button>
+        <button class="btn" style="padding:4px 8px;font-size:11px;color:var(--warn)" onclick="promptRollback('${d.id}')">Rollback</button>
+        <button class="btn" style="padding:4px 8px;font-size:11px;color:var(--danger)" onclick="killDeployment('${d.id}')">Kill</button>
+      </td>
+    </tr>
+  `).join('');
+  updateStats();
+}
+
+async function viewManifest(id) {
+  try {
+    const r = await fetch(`${API}/api/deployments/${id}/manifests`);
+    const data = await r.json();
+    document.getElementById('manifestContent').textContent = data.deployment + "\n---\n" + data.service;
+    document.getElementById('manifestModal').style.display = 'grid';
+  } catch(err) { toast("Failed to load manifest", true); }
+}
+
+function closeModal() {
+  document.getElementById('manifestModal').style.display = 'none';
+}
+
+function openTest(id) {
+  document.getElementById('inferenceTestPanel').style.display = 'block';
+  document.getElementById('testEndpoint').value = id;
+  document.getElementById('testResult').style.display = 'none';
+}
+
+async function testInference() {
+  const id = document.getElementById('testEndpoint').value;
+  const payloadStr = document.getElementById('testPayload').value;
+  let payload;
+  try { payload = JSON.parse(payloadStr); } catch { return toast("Invalid JSON payload", true); }
+
+  const resDiv = document.getElementById('testResult');
+  resDiv.style.display = 'block';
+  resDiv.textContent = "Processing inference request...\n\n[ K8s Gateway -> ClusterIP -> Pod ]";
+
+  setTimeout(async () => {
+    try {
+      const r = await fetch(`${API}/predict/${id}`, {
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify({ input_data: payload })
+      });
+      const data = await r.json();
+      if(!r.ok) {
+        let msg = data.detail;
+        if (typeof msg === 'object') msg = JSON.stringify(msg, null, 2);
+        throw new Error(msg || "Inference server error");
+      }
+      resDiv.innerHTML = `<span style="color:var(--green)">200 OK</span>\n\n` + JSON.stringify(data, null, 2);
+    } catch(err) {
+      resDiv.innerHTML = `<span style="color:var(--danger)">ERROR</span>\n\n` + err.message;
+    }
+  }, 600); // fake network delay
+}
+
+async function killDeployment(id) {
+  if(!confirm("Terminate this K8s deployment?")) return;
+  await fetch(`${API}/api/deployments/${id}`, { method: 'DELETE' });
+  toast("Deployment terminated");
+  loadDeployments();
+}
+
+async function promptRollback(id) {
+  const v = prompt("Enter version to rollback to (e.g. 'v1'):");
+  if(!v) return;
+  try {
+    const r = await fetch(`${API}/api/deployments/${id}/rollback?version=${v}`, { method: 'PUT' });
+    if(!r.ok) throw new Error((await r.json()).detail);
+    toast(`Rolled back to ${v}`);
+    loadDeployments();
+  } catch(err) { toast(err.message, true); }
+}
+
+// Init
+const savedTheme = localStorage.getItem('modelhub-theme') || 'dark';
+document.body.setAttribute('data-theme', savedTheme);
+
+function toggleTheme() {
+  const current = document.body.getAttribute('data-theme');
+  const next = current === 'light' ? 'dark' : 'light';
+  document.body.setAttribute('data-theme', next);
+  localStorage.setItem('modelhub-theme', next);
+}
+
+loadModels();
+</script>
+</body>
+</html>

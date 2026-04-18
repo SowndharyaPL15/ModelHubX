@@ -1,0 +1,26 @@
+# ── ModelHubX Controller Dockerfile ─────────────────────────────────────────
+FROM python:3.11-slim
+
+LABEL maintainer="ModelHubX Team"
+LABEL description="ModelHubX FastAPI MLOps Controller"
+
+WORKDIR /app
+
+# Install dependencies first (layer cache)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source
+COPY . .
+
+EXPOSE 8000
+
+# Non-root user for security
+RUN adduser --disabled-password --gecos "" appuser
+
+# Create storage directories and set permissions
+RUN mkdir -p /models /out && chown -R appuser:appuser /models /out
+
+USER appuser
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
