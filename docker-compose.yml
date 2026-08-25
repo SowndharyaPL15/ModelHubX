@@ -16,8 +16,8 @@ services:
 
   api:
     build:
-      context: ./api
-      dockerfile: ../docker/Dockerfile.api
+      context: .
+      dockerfile: docker/Dockerfile.api
     container_name: modelhubx-api
     ports:
       - "8000:8000"
