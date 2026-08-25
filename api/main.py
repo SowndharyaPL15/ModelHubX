@@ -35,6 +35,7 @@ app.add_middleware(
 # ── Env & Storage ───────────────────────────────────────────────────────────
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_URL = os.getenv("REDIS_URL") or os.getenv("INTERNAL_REDIS_URL")
 MODELS_DIR = os.getenv("MODELS_DIR", "./models")
 OUT_DIR = os.getenv("OUT_DIR", "./out")
 
@@ -59,6 +60,8 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(OUT_DIR, exist_ok=True)
 
 def get_redis():
+    if REDIS_URL:
+        return redis.Redis.from_url(REDIS_URL, decode_responses=True)
     return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 # ── Keys ────────────────────────────────────────────────────────────────────
