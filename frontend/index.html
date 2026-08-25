@@ -478,11 +478,14 @@ async function apiFetch(url, options = {}) {
     const res = await fetch(url, options);
     if (res.status === 401) {
       showAuthOverlay(true);
-      throw new Error("Session expired. Please log in again.");
+      if (!options.isInit) {
+        throw new Error("Session expired. Please log in again.");
+      }
+      throw new Error("Not logged in");
     }
     return res;
   } catch (err) {
-    if (err.message.includes("Session expired")) {
+    if (err.message.includes("Session expired") && !options.isInit) {
       toast(err.message, true);
     }
     throw err;
@@ -564,7 +567,13 @@ async function handleAuthSubmit(e) {
       body: JSON.stringify(payload)
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data.detail || "Authentication failed");
+    if (!r.ok) {
+      let errorMsg = data.detail || "Authentication failed";
+      if (typeof errorMsg === 'object') {
+        errorMsg = JSON.stringify(errorMsg);
+      }
+      throw new Error(errorMsg);
+    }
     
     if (currentAuthMode === 'login') {
       toast("Login successful!");
@@ -579,20 +588,22 @@ async function handleAuthSubmit(e) {
       document.getElementById('loginUsername').value = username;
     }
   } catch(err) {
+    console.error("Authentication Error:", err);
     toast(err.message, true);
   }
 }
 
 async function checkAuth() {
   try {
-    const r = await apiFetch(`${API}/api/auth/me`);
+    const r = await apiFetch(`${API}/api/auth/me`, { isInit: true });
     if (r.ok) {
       showAuthOverlay(false);
       loadModels();
     } else {
       showAuthOverlay(true);
     }
-  } catch {
+  } catch (err) {
+    console.warn("Initial Auth Check:", err.message);
     showAuthOverlay(true);
   }
 }
