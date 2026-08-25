@@ -219,52 +219,60 @@ spec:
     return deployment_yaml, service_yaml
 
 
-class AuthRequest(BaseModel):
-    username: str
+class SignupRequest(BaseModel):
+    name: str
+    email: str
     password: str
-    fullname: Optional[str] = None
-    email: Optional[str] = None
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 @app.post("/api/auth/signup", tags=["Authentication"])
-def signup(req: AuthRequest):
+def signup(req: SignupRequest):
     r = get_redis()
-    username_clean = req.username.strip()
-    if not username_clean:
-        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    email_clean = req.email.strip().lower()
+    name_clean = req.name.strip()
+    if not email_clean or not name_clean:
+        raise HTTPException(status_code=400, detail="Name and email are required")
     if len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
     
     # Check if user exists
-    if r.hexists(USERS_HSET, username_clean):
-        raise HTTPException(status_code=400, detail="Username already exists")
+    if r.hexists(USERS_HSET, email_clean):
+        raise HTTPException(status_code=400, detail="Email already registered")
         
     hashed, salt = hash_password(req.password)
+    user_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
     user_data = {
+        "id": user_id,
+        "name": name_clean,
+        "email": email_clean,
         "hashed_password": hashed,
         "salt": salt,
-        "fullname": req.fullname or "",
-        "email": req.email or "",
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": now,
+        "updated_at": now
     }
-    r.hset(USERS_HSET, username_clean, json.dumps(user_data))
-    return {"message": "User registered successfully", "username": username_clean}
+    r.hset(USERS_HSET, email_clean, json.dumps(user_data))
+    return {"message": "User registered successfully", "email": email_clean}
 
 @app.post("/api/auth/login", tags=["Authentication"])
-def login(req: AuthRequest, response: Response):
+def login(req: LoginRequest, response: Response):
     r = get_redis()
-    username_clean = req.username.strip()
-    user_raw = r.hget(USERS_HSET, username_clean)
+    email_clean = req.email.strip().lower()
+    user_raw = r.hget(USERS_HSET, email_clean)
     if not user_raw:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
         
     user_data = json.loads(user_raw)
     if not verify_password(req.password, user_data["hashed_password"], user_data["salt"]):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
         
     # Generate session
     session_token = secrets.token_hex(32)
     # Store session with 2 hours TTL (7200 seconds)
-    r.setex(f"{SESSIONS_PREFIX}{session_token}", 7200, username_clean)
+    r.setex(f"{SESSIONS_PREFIX}{session_token}", 7200, email_clean)
     
     # Set Cookie
     response.set_cookie(
@@ -276,7 +284,7 @@ def login(req: AuthRequest, response: Response):
         secure=False
     )
     
-    return {"message": "Login successful", "username": username_clean, "session_token": session_token}
+    return {"message": "Login successful", "email": email_clean, "session_token": session_token}
 
 @app.post("/api/auth/logout", tags=["Authentication"])
 def logout(response: Response, session_token: Optional[str] = Cookie(None)):
@@ -287,8 +295,15 @@ def logout(response: Response, session_token: Optional[str] = Cookie(None)):
     return {"message": "Logged out successfully"}
 
 @app.get("/api/auth/me", tags=["Authentication"])
-def get_me(username: str = Depends(get_current_user)):
-    return {"username": username}
+def get_me(email: str = Depends(get_current_user)):
+    r = get_redis()
+    user_raw = r.hget(USERS_HSET, email)
+    if not user_raw:
+        raise HTTPException(status_code=404, detail="User not found")
+    user_data = json.loads(user_raw)
+    user_data.pop("hashed_password", None)
+    user_data.pop("salt", None)
+    return user_data
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────

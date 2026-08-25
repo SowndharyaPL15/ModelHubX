@@ -426,21 +426,27 @@ tr:hover td { background: rgba(255,255,255,0.015); }
       <!-- Login Form -->
       <form id="loginForm" onsubmit="handleAuthSubmit(event)">
         <div class="form-group">
-          <label>Username</label>
-          <input type="text" id="loginUsername" autocomplete="username" required>
+          <label>Email Address</label>
+          <input type="email" id="loginEmail" placeholder="e.g. john@modelhub.com" required>
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input type="password" id="loginPassword" autocomplete="current-password" required>
+          <div style="position: relative; display: flex; align-items: center;">
+            <input type="password" id="loginPassword" autocomplete="current-password" required style="padding-right: 60px;">
+            <button type="button" class="btn" onclick="togglePasswordVisibility('loginPassword', this)" style="position: absolute; right: 8px; background: none; border: none; color: var(--text-dim); padding: 4px 8px; font-size: 11px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: none;">Show</button>
+          </div>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 12px; padding: 14px;">Sign In</button>
+        <button type="submit" id="btnLoginSubmit" class="btn btn-primary" style="width: 100%; margin-top: 12px; padding: 14px;">Sign In</button>
+        <div style="margin-top: 16px; text-align: center; font-size: 13px;">
+          <a href="#" onclick="showAuthMode('signup'); event.preventDefault();" style="color: var(--accent); text-decoration: none; font-weight: 500;">Don't have an account? Sign Up</a>
+        </div>
       </form>
 
       <!-- Signup Form -->
       <form id="signupForm" style="display: none;" onsubmit="handleAuthSubmit(event)">
         <div class="form-group">
-          <label>Username</label>
-          <input type="text" id="signupUsername" autocomplete="username" required>
+          <label>Full Name</label>
+          <input type="text" id="signupFullName" placeholder="e.g. John Doe" required>
         </div>
         <div class="form-group">
           <label>Email Address</label>
@@ -448,13 +454,22 @@ tr:hover td { background: rgba(255,255,255,0.015); }
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input type="password" id="signupPassword" autocomplete="new-password" required>
+          <div style="position: relative; display: flex; align-items: center;">
+            <input type="password" id="signupPassword" autocomplete="new-password" required style="padding-right: 60px;">
+            <button type="button" class="btn" onclick="togglePasswordVisibility('signupPassword', this)" style="position: absolute; right: 8px; background: none; border: none; color: var(--text-dim); padding: 4px 8px; font-size: 11px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: none;">Show</button>
+          </div>
         </div>
         <div class="form-group">
           <label>Confirm Password</label>
-          <input type="password" id="signupConfirmPassword" autocomplete="new-password" required style="width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 14px; padding: 12px 16px; border-radius: 10px; outline: none; transition: 0.2s;">
+          <div style="position: relative; display: flex; align-items: center; width: 100%;">
+            <input type="password" id="signupConfirmPassword" autocomplete="new-password" required style="padding-right: 60px; width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 14px; padding: 12px 16px; border-radius: 10px; outline: none; transition: 0.2s;">
+            <button type="button" class="btn" onclick="togglePasswordVisibility('signupConfirmPassword', this)" style="position: absolute; right: 8px; background: none; border: none; color: var(--text-dim); padding: 4px 8px; font-size: 11px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: none;">Show</button>
+          </div>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 12px; padding: 14px;">Create Account</button>
+        <button type="submit" id="btnSignupSubmit" class="btn btn-primary" style="width: 100%; margin-top: 12px; padding: 14px;">Create Account</button>
+        <div style="margin-top: 16px; text-align: center; font-size: 13px;">
+          <a href="#" onclick="showAuthMode('login'); event.preventDefault();" style="color: var(--accent); text-decoration: none; font-weight: 500;">Already have an account? Login</a>
+        </div>
       </form>
     </div>
 
@@ -502,6 +517,22 @@ function showAuthOverlay(show) {
   }
 }
 
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    input.type = 'password';
+    btn.textContent = 'Show';
+  }
+}
+
+function validateEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
 function showAuthMode(mode) {
   currentAuthMode = mode;
   const homeCard = document.getElementById('authHomeContent');
@@ -511,12 +542,20 @@ function showAuthMode(mode) {
   const signupForm = document.getElementById('signupForm');
 
   // Clear fields
-  document.getElementById('loginUsername').value = '';
+  document.getElementById('loginEmail').value = '';
   document.getElementById('loginPassword').value = '';
-  document.getElementById('signupUsername').value = '';
+  document.getElementById('signupFullName').value = '';
   document.getElementById('signupEmail').value = '';
   document.getElementById('signupPassword').value = '';
   document.getElementById('signupConfirmPassword').value = '';
+
+  // Reset password toggles to 'password' type
+  document.getElementById('loginPassword').type = 'password';
+  document.getElementById('signupPassword').type = 'password';
+  document.getElementById('signupConfirmPassword').type = 'password';
+  
+  // Reset toggle buttons text
+  document.querySelectorAll('#authOverlay button[onclick^="togglePasswordVisibility"]').forEach(b => b.textContent = 'Show');
 
   if (mode === 'home') {
     homeCard.style.display = 'block';
@@ -538,25 +577,42 @@ function showAuthMode(mode) {
 
 async function handleAuthSubmit(e) {
   e.preventDefault();
-  let username = '';
+  let email = '';
   let password = '';
   let payload = {};
   
+  const submitBtn = currentAuthMode === 'login' 
+    ? document.getElementById('btnLoginSubmit') 
+    : document.getElementById('btnSignupSubmit');
+    
+  const originalText = submitBtn.textContent;
+  
   if (currentAuthMode === 'login') {
-    username = document.getElementById('loginUsername').value.trim();
+    email = document.getElementById('loginEmail').value.trim().toLowerCase();
     password = document.getElementById('loginPassword').value;
-    if (!username || !password) return toast("Username and password are required", true);
-    payload = { username, password };
+    
+    if (!email) return toast("Email is required", true);
+    if (!password) return toast("Password is required", true);
+    if (!validateEmail(email)) return toast("Please enter a valid email address", true);
+    
+    payload = { email, password };
   } else {
-    username = document.getElementById('signupUsername').value.trim();
-    const email = document.getElementById('signupEmail').value.trim();
+    const name = document.getElementById('signupFullName').value.trim();
+    email = document.getElementById('signupEmail').value.trim().toLowerCase();
     password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('signupConfirmPassword').value;
     
-    if (!username || !password || !email) return toast("All fields are required", true);
+    if (!name || !email || !password || !confirmPassword) return toast("All fields are required", true);
+    if (!validateEmail(email)) return toast("Please enter a valid email address", true);
+    if (password.length < 6) return toast("Password must be at least 6 characters long", true);
     if (password !== confirmPassword) return toast("Passwords do not match", true);
-    payload = { username, email, password };
+    
+    payload = { name, email, password };
   }
+  
+  // Set Loading State
+  submitBtn.disabled = true;
+  submitBtn.textContent = currentAuthMode === 'login' ? "Logging in..." : "Creating account...";
   
   const path = currentAuthMode === 'login' ? '/api/auth/login' : '/api/auth/signup';
   
@@ -567,6 +623,7 @@ async function handleAuthSubmit(e) {
       body: JSON.stringify(payload)
     });
     const data = await r.json();
+    
     if (!r.ok) {
       let errorMsg = data.detail || "Authentication failed";
       if (typeof errorMsg === 'object') {
@@ -584,12 +641,16 @@ async function handleAuthSubmit(e) {
     } else {
       toast("Registration successful! Please log in.");
       showAuthMode('login');
-      // Autofill registered username for easier login
-      document.getElementById('loginUsername').value = username;
+      // Autofill registered email for easier login
+      document.getElementById('loginEmail').value = email;
     }
   } catch(err) {
     console.error("Authentication Error:", err);
     toast(err.message, true);
+  } finally {
+    // Reset button state
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
   }
 }
 
