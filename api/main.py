@@ -35,7 +35,23 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 MODELS_DIR = os.getenv("MODELS_DIR", "./models")
 OUT_DIR = os.getenv("OUT_DIR", "./out")
-FRONTEND_DIR = os.getenv("FRONTEND_DIR", "../frontend")
+
+# Resolve FRONTEND_DIR dynamically by scanning likely paths
+FRONTEND_DIR = os.getenv("FRONTEND_DIR")
+if not FRONTEND_DIR:
+    possible_dirs = [
+        "/frontend",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "../frontend"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend"),
+        "./frontend",
+        "../frontend"
+    ]
+    for d in possible_dirs:
+        if os.path.exists(os.path.join(d, "index.html")):
+            FRONTEND_DIR = d
+            break
+    if not FRONTEND_DIR:
+        FRONTEND_DIR = "../frontend"
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(OUT_DIR, exist_ok=True)
