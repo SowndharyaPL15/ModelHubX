@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code and frontend assets with correct ownership
 COPY --chown=appuser:appuser api/ .
-COPY --chown=appuser:appuser frontend/ /frontend/
+COPY --chown=appuser:appuser frontend/ ./frontend/
 
 EXPOSE 8000
 
