@@ -3,11 +3,13 @@ import uuid
 import json
 import time
 import pickle
+import hashlib
+import secrets
 from datetime import datetime
 from typing import Optional, List
 
 import redis
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Cookie, Depends, Response, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -62,6 +64,36 @@ def get_redis():
 # ── Keys ────────────────────────────────────────────────────────────────────
 MODELS_HSET = "modelhub:models"           # Map of name -> list of versions
 DEPLOYMENTS_HSET = "modelhub:deployments" # Map of deployment_id -> deployment_metadata
+USERS_HSET = "modelhub:users"              # Map of username -> {"hashed_password": ..., "salt": ...}
+SESSIONS_PREFIX = "modelhub:session:"     # redis string key -> username
+SESSION_COOKIE_NAME = "session_token"
+
+# ── Security Helpers ────────────────────────────────────────────────────────
+def hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
+    if not salt:
+        salt = secrets.token_hex(16)
+    hashed = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
+    return hashed, salt
+
+def verify_password(password: str, hashed: str, salt: str) -> bool:
+    return hashlib.sha256((password + salt).encode('utf-8')).hexdigest() == hashed
+
+def get_current_user(
+    session_token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None)
+):
+    token = session_token
+    if not token and authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    r = get_redis()
+    username = r.get(f"{SESSIONS_PREFIX}{token}")
+    if not username:
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
+    return username
 
 # ── Serving ─────────────────────────────────────────────────────────────────
 @app.get("/")
@@ -187,6 +219,74 @@ spec:
     return deployment_yaml, service_yaml
 
 
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/signup", tags=["Authentication"])
+def signup(req: AuthRequest):
+    r = get_redis()
+    username_clean = req.username.strip()
+    if not username_clean:
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    if len(req.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    # Check if user exists
+    if r.hexists(USERS_HSET, username_clean):
+        raise HTTPException(status_code=400, detail="Username already exists")
+        
+    hashed, salt = hash_password(req.password)
+    user_data = {
+        "hashed_password": hashed,
+        "salt": salt,
+        "created_at": datetime.utcnow().isoformat()
+    }
+    r.hset(USERS_HSET, username_clean, json.dumps(user_data))
+    return {"message": "User registered successfully", "username": username_clean}
+
+@app.post("/api/auth/login", tags=["Authentication"])
+def login(req: AuthRequest, response: Response):
+    r = get_redis()
+    username_clean = req.username.strip()
+    user_raw = r.hget(USERS_HSET, username_clean)
+    if not user_raw:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+    user_data = json.loads(user_raw)
+    if not verify_password(req.password, user_data["hashed_password"], user_data["salt"]):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+    # Generate session
+    session_token = secrets.token_hex(32)
+    # Store session with 2 hours TTL (7200 seconds)
+    r.setex(f"{SESSIONS_PREFIX}{session_token}", 7200, username_clean)
+    
+    # Set Cookie
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_token,
+        httponly=True,
+        max_age=7200,
+        samesite="lax",
+        secure=False
+    )
+    
+    return {"message": "Login successful", "username": username_clean, "session_token": session_token}
+
+@app.post("/api/auth/logout", tags=["Authentication"])
+def logout(response: Response, session_token: Optional[str] = Cookie(None)):
+    if session_token:
+        r = get_redis()
+        r.delete(f"{SESSIONS_PREFIX}{session_token}")
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return {"message": "Logged out successfully"}
+
+@app.get("/api/auth/me", tags=["Authentication"])
+def get_me(username: str = Depends(get_current_user)):
+    return {"username": username}
+
+
 # ── Routes ──────────────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["Health"])
@@ -199,7 +299,7 @@ def health():
         raise HTTPException(status_code=503, detail=f"Redis unavailable: {e}")
 
 @app.post("/api/models", tags=["Model Registry"])
-async def upload_model(name: str = Form(...), file: UploadFile = File(...)):
+async def upload_model(name: str = Form(...), file: UploadFile = File(...), username: str = Depends(get_current_user)):
     """Upload a model file, auto-assigning it a sequential version (v1, v2)."""
     r = get_redis()
     
@@ -239,7 +339,7 @@ async def upload_model(name: str = Form(...), file: UploadFile = File(...)):
     }
 
 @app.get("/api/models", tags=["Model Registry"])
-def list_models():
+def list_models(username: str = Depends(get_current_user)):
     """List all registered models and their versions."""
     r = get_redis()
     all_models = r.hgetall(MODELS_HSET)
@@ -255,7 +355,7 @@ def list_models():
     return response
 
 @app.post("/api/deployments", tags=["Deployments"])
-def deploy_model(req: DeploymentRequest):
+def deploy_model(req: DeploymentRequest, username: str = Depends(get_current_user)):
     """Deploy a model version, triggering K8s manifest auto-generation."""
     r = get_redis()
     
@@ -301,14 +401,14 @@ def deploy_model(req: DeploymentRequest):
     }
 
 @app.get("/api/deployments", tags=["Deployments"])
-def list_deployments():
+def list_deployments(username: str = Depends(get_current_user)):
     """List all active model API endpoints."""
     r = get_redis()
     deps_raw = r.hgetall(DEPLOYMENTS_HSET)
     return [json.loads(v) for v in deps_raw.values()]
 
 @app.get("/api/deployments/{deployment_id}/manifests", tags=["Deployments"])
-def get_deployment_manifests(deployment_id: str):
+def get_deployment_manifests(deployment_id: str, username: str = Depends(get_current_user)):
     """Retrieve the generated K8s manifests for a deployment."""
     r = get_redis()
     dep_raw = r.hget(DEPLOYMENTS_HSET, deployment_id)
@@ -318,7 +418,7 @@ def get_deployment_manifests(deployment_id: str):
     return deployment["manifests"]
 
 @app.put("/api/deployments/{deployment_id}/rollback", tags=["Deployments"])
-def rollback_deployment(deployment_id: str, version: str):
+def rollback_deployment(deployment_id: str, version: str, username: str = Depends(get_current_user)):
     """Update an existing deployment to a different version (Rolling Update)."""
     r = get_redis()
     dep_raw = r.hget(DEPLOYMENTS_HSET, deployment_id)
@@ -350,7 +450,7 @@ def rollback_deployment(deployment_id: str, version: str):
     return {"message": "Rollback successful", "deployment": deployment}
 
 @app.delete("/api/deployments/{deployment_id}", tags=["Deployments"])
-def remove_deployment(deployment_id: str):
+def remove_deployment(deployment_id: str, username: str = Depends(get_current_user)):
     """Tear down a deployment."""
     r = get_redis()
     success = r.hdel(DEPLOYMENTS_HSET, deployment_id)
@@ -364,7 +464,7 @@ def remove_deployment(deployment_id: str):
 # We simply dynamically load the selected model's .pkl file exactly as the deployed K8s Pod would.
 # This simulates hitting the ClusterIP service of the deployed model!
 @app.post("/predict/{deployment_id}", tags=["Inference Gateway"])
-async def predict_gateway(deployment_id: str, req: PredictRequest):
+async def predict_gateway(deployment_id: str, req: PredictRequest, username: str = Depends(get_current_user)):
     """
     Hit the exposed model endpoint with input data (e.g. {"input_data": [[1,2,3,4]]}).
     """

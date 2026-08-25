@@ -143,7 +143,7 @@ nav button.active { color: #fff; background: var(--surface-top); border: 1px sol
 .form-group { margin-bottom: 24px; }
 .form-group label { display: block; font-family: var(--int); font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; }
 
-input[type="text"], input[type="file"], select, input[type="range"] {
+input[type="text"], input[type="password"], input[type="file"], select, input[type="range"] {
   width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border);
   color: var(--text); font-family: var(--mono); font-size: 14px;
   padding: 12px 16px; border-radius: 10px; outline: none; transition: 0.2s;
@@ -251,6 +251,7 @@ tr:hover td { background: rgba(255,255,255,0.015); }
     <button id="theme-toggle" class="btn btn-secondary" style="padding:6px 10px; margin-right:10px" onclick="toggleTheme()">🌓</button>
     <button id="nav-registry" class="active" onclick="showTab('registry')">Model Registry</button>
     <button id="nav-deployments" onclick="showTab('deployments')">Deployments</button>
+    <button id="nav-logout" class="btn btn-secondary" style="padding:6px 14px; margin-left:10px; border-color:var(--danger); color:var(--danger)" onclick="logout()">Logout</button>
   </nav>
 </header>
 
@@ -379,9 +380,144 @@ tr:hover td { background: rgba(255,255,255,0.015); }
   </div>
 </div>
 
+<!-- ==================== AUTH OVERLAY ==================== -->
+<div id="authOverlay" class="modal-overlay" style="display: none; z-index: 9999;">
+  <div class="panel" style="width: 400px; max-width: 90%; background: var(--surface-top); border-color: var(--accent);">
+    <div class="panel-header" style="justify-content: center; font-size: 14px; font-weight: bold; letter-spacing: 0.05em; color: var(--text);">
+      <span id="authTitle">ModelHubX Authentication</span>
+    </div>
+    <div class="panel-body">
+      <div style="display: flex; gap: 8px; margin-bottom: 24px;">
+        <button id="btnTabLogin" class="btn btn-primary" style="flex: 1; font-size: 12px; padding: 8px;" onclick="showAuthTab('login')">Login</button>
+        <button id="btnTabSignup" class="btn btn-secondary" style="flex: 1; font-size: 12px; padding: 8px;" onclick="showAuthTab('signup')">Sign Up</button>
+      </div>
+      <form onsubmit="handleAuthSubmit(event)">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="authUsername" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="authPassword" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="btnAuthSubmit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Login</button>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+let authToken = localStorage.getItem('modelhub-token');
 let globalModels = [];
+let currentAuthMode = 'login';
+
+async function apiFetch(url, options = {}) {
+  options.headers = options.headers || {};
+  if (authToken) {
+    options.headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  options.credentials = 'include';
+
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      showAuthOverlay(true);
+      throw new Error("Session expired. Please log in again.");
+    }
+    return res;
+  } catch (err) {
+    if (err.message.includes("Session expired")) {
+      toast(err.message, true);
+    }
+    throw err;
+  }
+}
+
+function showAuthOverlay(show) {
+  const overlay = document.getElementById('authOverlay');
+  overlay.style.display = show ? 'grid' : 'none';
+  if (show) {
+    document.getElementById('authUsername').value = '';
+    document.getElementById('authPassword').value = '';
+  }
+}
+
+function showAuthTab(mode) {
+  currentAuthMode = mode;
+  const btnLogin = document.getElementById('btnTabLogin');
+  const btnSignup = document.getElementById('btnTabSignup');
+  const title = document.getElementById('authTitle');
+  const btnSubmit = document.getElementById('btnAuthSubmit');
+  
+  if (mode === 'login') {
+    btnLogin.className = 'btn btn-primary';
+    btnSignup.className = 'btn btn-secondary';
+    title.textContent = 'ModelHubX Login';
+    btnSubmit.textContent = 'Login';
+  } else {
+    btnLogin.className = 'btn btn-secondary';
+    btnSignup.className = 'btn btn-primary';
+    title.textContent = 'ModelHubX Register';
+    btnSubmit.textContent = 'Sign Up';
+  }
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  const username = document.getElementById('authUsername').value.trim();
+  const password = document.getElementById('authPassword').value;
+  
+  if (!username || !password) return toast("Username and password are required", true);
+  
+  const path = currentAuthMode === 'login' ? '/api/auth/login' : '/api/auth/signup';
+  try {
+    const r = await fetch(`${API}${path}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || "Authentication failed");
+    
+    if (currentAuthMode === 'login') {
+      toast("Login successful!");
+      authToken = data.session_token;
+      localStorage.setItem('modelhub-token', authToken);
+      showAuthOverlay(false);
+      loadModels();
+    } else {
+      toast("Registration successful! You can now log in.");
+      showAuthTab('login');
+    }
+  } catch(err) {
+    toast(err.message, true);
+  }
+}
+
+async function checkAuth() {
+  try {
+    const r = await apiFetch(`${API}/api/auth/me`);
+    if (r.ok) {
+      showAuthOverlay(false);
+      loadModels();
+    } else {
+      showAuthOverlay(true);
+    }
+  } catch {
+    showAuthOverlay(true);
+  }
+}
+
+async function logout() {
+  try {
+    await apiFetch(`${API}/api/auth/logout`, { method: 'POST' });
+  } catch(e) {}
+  authToken = null;
+  localStorage.removeItem('modelhub-token');
+  toast("Logged out successfully");
+  showAuthOverlay(true);
+}
 
 function showTab(tab) {
   document.getElementById('tab-registry').style.display = tab === 'registry' ? 'block' : 'none';
@@ -416,7 +552,7 @@ function updateStats() {
 
 // ── REGISTRY ─────────────────────────────────────────────────────────────
 async function loadModels() {
-  const res = await fetch(`${API}/api/models`);
+  const res = await apiFetch(`${API}/api/models`);
   globalModels = await res.json();
   
   const tb = document.getElementById('modelsTable');
@@ -461,7 +597,7 @@ async function uploadModel(e) {
   formData.append('file', file);
 
   try {
-    const r = await fetch(`${API}/api/models`, { method: 'POST', body: formData });
+    const r = await apiFetch(`${API}/api/models`, { method: 'POST', body: formData });
     if(!r.ok) throw new Error("Upload failed");
     toast(`Successfully uploaded ${name}`);
     document.getElementById('uploadForm').reset();
@@ -478,7 +614,7 @@ async function deployModel(e) {
   };
   
   try {
-    const r = await fetch(`${API}/api/deployments`, {
+    const r = await apiFetch(`${API}/api/deployments`, {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(req)
     });
     if(!r.ok) throw new Error("Deployment failed");
@@ -489,7 +625,7 @@ async function deployModel(e) {
 
 // ── DEPLOYMENTS ──────────────────────────────────────────────────────────
 async function loadDeployments() {
-  const res = await fetch(`${API}/api/deployments`);
+  const res = await apiFetch(`${API}/api/deployments`);
   globalDeployments = await res.json();
   const tb = document.getElementById('deployTable');
   
@@ -520,7 +656,7 @@ async function loadDeployments() {
 
 async function viewManifest(id) {
   try {
-    const r = await fetch(`${API}/api/deployments/${id}/manifests`);
+    const r = await apiFetch(`${API}/api/deployments/${id}/manifests`);
     const data = await r.json();
     document.getElementById('manifestContent').textContent = data.deployment + "\n---\n" + data.service;
     document.getElementById('manifestModal').style.display = 'grid';
@@ -549,7 +685,7 @@ async function testInference() {
 
   setTimeout(async () => {
     try {
-      const r = await fetch(`${API}/predict/${id}`, {
+      const r = await apiFetch(`${API}/predict/${id}`, {
         method: 'POST', 
         headers: {'Content-Type': 'application/json'}, 
         body: JSON.stringify({ input_data: payload })
@@ -569,7 +705,7 @@ async function testInference() {
 
 async function killDeployment(id) {
   if(!confirm("Terminate this K8s deployment?")) return;
-  await fetch(`${API}/api/deployments/${id}`, { method: 'DELETE' });
+  await apiFetch(`${API}/api/deployments/${id}`, { method: 'DELETE' });
   toast("Deployment terminated");
   loadDeployments();
 }
@@ -578,7 +714,7 @@ async function promptRollback(id) {
   const v = prompt("Enter version to rollback to (e.g. 'v1'):");
   if(!v) return;
   try {
-    const r = await fetch(`${API}/api/deployments/${id}/rollback?version=${v}`, { method: 'PUT' });
+    const r = await apiFetch(`${API}/api/deployments/${id}/rollback?version=${v}`, { method: 'PUT' });
     if(!r.ok) throw new Error((await r.json()).detail);
     toast(`Rolled back to ${v}`);
     loadDeployments();
@@ -596,7 +732,7 @@ function toggleTheme() {
   localStorage.setItem('modelhub-theme', next);
 }
 
-loadModels();
+checkAuth();
 </script>
 </body>
 </html>
