@@ -222,6 +222,8 @@ spec:
 class AuthRequest(BaseModel):
     username: str
     password: str
+    fullname: Optional[str] = None
+    email: Optional[str] = None
 
 @app.post("/api/auth/signup", tags=["Authentication"])
 def signup(req: AuthRequest):
@@ -240,6 +242,8 @@ def signup(req: AuthRequest):
     user_data = {
         "hashed_password": hashed,
         "salt": salt,
+        "fullname": req.fullname or "",
+        "email": req.email or "",
         "created_at": datetime.utcnow().isoformat()
     }
     r.hset(USERS_HSET, username_clean, json.dumps(user_data))
