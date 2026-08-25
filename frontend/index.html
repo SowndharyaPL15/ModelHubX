@@ -242,6 +242,7 @@ tr:hover td { background: rgba(255,255,255,0.015); }
 </head>
 <body>
 
+<div id="dashboardApp" style="display: none;">
 <header>
   <div class="logo">
     <div class="logo-icon">X</div>
@@ -364,6 +365,7 @@ tr:hover td { background: rgba(255,255,255,0.015); }
     </div>
   </main>
 </div>
+</div>
 
 <div id="toast"></div>
 
@@ -436,7 +438,9 @@ async function apiFetch(url, options = {}) {
 
 function showAuthOverlay(show) {
   const overlay = document.getElementById('authOverlay');
+  const dashboard = document.getElementById('dashboardApp');
   overlay.style.display = show ? 'grid' : 'none';
+  dashboard.style.display = show ? 'none' : 'block';
   if (show) {
     document.getElementById('authUsername').value = '';
     document.getElementById('authPassword').value = '';
