@@ -4,24 +4,25 @@ FROM python:3.11-slim
 LABEL maintainer="ModelHubX Team"
 LABEL description="ModelHubX FastAPI MLOps Controller"
 
+# Non-root user for security (created early so we can chown copied files)
+RUN adduser --disabled-password --gecos "" appuser
+
 WORKDIR /app
 
 # Install dependencies first (layer cache)
 COPY api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code and frontend assets
-COPY api/ .
-COPY frontend/ /frontend/
+# Copy source code and frontend assets with correct ownership
+COPY --chown=appuser:appuser api/ .
+COPY --chown=appuser:appuser frontend/ /frontend/
 
 EXPOSE 8000
-
-# Non-root user for security
-RUN adduser --disabled-password --gecos "" appuser
 
 # Create storage directories and set permissions
 RUN mkdir -p /models /out && chown -R appuser:appuser /models /out
 
 USER appuser
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Run via python -c to capture and output tracebacks if import main fails
+CMD ["python", "-c", "import main; import uvicorn; uvicorn.run('main:app', host='0.0.0.0', port=8000)"]
